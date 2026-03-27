@@ -162,6 +162,38 @@ describe("restoreEnvVarRefs", () => {
     expect(result).toEqual({ note: "$${ANTHROPIC_API_KEY}" });
   });
 
+  it("restores ${VAR:-default} reference when env var is set and matches", () => {
+    const incoming = { url: "https://prod.example.com" };
+    const parsed = { url: "${API_URL:-https://localhost:3000}" };
+    const envWithVar = { API_URL: "https://prod.example.com" } as unknown as NodeJS.ProcessEnv;
+    const result = restoreEnvVarRefs(incoming, parsed, envWithVar);
+    expect(result).toEqual({ url: "${API_URL:-https://localhost:3000}" });
+  });
+
+  it("restores ${VAR:-default} reference when env var is missing and default matches", () => {
+    const incoming = { url: "https://localhost:3000" };
+    const parsed = { url: "${API_URL:-https://localhost:3000}" };
+    const emptyEnv = {} as unknown as NodeJS.ProcessEnv;
+    const result = restoreEnvVarRefs(incoming, parsed, emptyEnv);
+    expect(result).toEqual({ url: "${API_URL:-https://localhost:3000}" });
+  });
+
+  it("keeps incoming when ${VAR:-default} resolves to a different value", () => {
+    const incoming = { url: "https://new-value.example.com" };
+    const parsed = { url: "${API_URL:-https://localhost:3000}" };
+    const emptyEnv = {} as unknown as NodeJS.ProcessEnv;
+    const result = restoreEnvVarRefs(incoming, parsed, emptyEnv);
+    expect(result).toEqual({ url: "https://new-value.example.com" });
+  });
+
+  it("restores ${VAR:-} (empty default) when env is missing and incoming is empty", () => {
+    const incoming = { token: "" };
+    const parsed = { token: "${OPT_TOKEN:-}" };
+    const emptyEnv = {} as unknown as NodeJS.ProcessEnv;
+    const result = restoreEnvVarRefs(incoming, parsed, emptyEnv);
+    expect(result).toEqual({ token: "${OPT_TOKEN:-}" });
+  });
+
   it("does not confuse $${VAR} escape with ${VAR} substitution", () => {
     // Config has both: an escaped ref and a real ref
     const incoming = {

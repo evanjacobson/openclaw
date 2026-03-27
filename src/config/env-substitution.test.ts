@@ -314,6 +314,108 @@ describe("resolveConfigEnvVars", () => {
     });
   });
 
+  describe("default value syntax (${VAR:-default})", () => {
+    it("uses default when var is missing", () => {
+      const scenarios: SubstitutionScenario[] = [
+        {
+          name: "simple default",
+          config: { key: "${MISSING:-fallback}" },
+          env: {},
+          expected: { key: "fallback" },
+        },
+        {
+          name: "empty string default",
+          config: { key: "${MISSING:-}" },
+          env: {},
+          expected: { key: "" },
+        },
+        {
+          name: "default with URL",
+          config: { url: "${API_URL:-https://localhost:3000}" },
+          env: {},
+          expected: { url: "https://localhost:3000" },
+        },
+        {
+          name: "default with colons in value",
+          config: { dsn: "${DATABASE_URL:-postgres://localhost:5432/dev}" },
+          env: {},
+          expected: { dsn: "postgres://localhost:5432/dev" },
+        },
+      ];
+
+      expectResolvedScenarios(scenarios);
+    });
+
+    it("uses env value when var is set, ignoring default", () => {
+      const scenarios: SubstitutionScenario[] = [
+        {
+          name: "env var present overrides default",
+          config: { key: "${FOO:-fallback}" },
+          env: { FOO: "real" },
+          expected: { key: "real" },
+        },
+        {
+          name: "env var present with URL default",
+          config: { url: "${API_URL:-https://localhost:3000}" },
+          env: { API_URL: "https://prod.example.com" },
+          expected: { url: "https://prod.example.com" },
+        },
+      ];
+
+      expectResolvedScenarios(scenarios);
+    });
+
+    it("treats empty env value as missing (falls back to default)", () => {
+      expect(
+        resolveConfigEnvVars({ key: "${EMPTY:-fallback}" }, { EMPTY: "" } as NodeJS.ProcessEnv),
+      ).toEqual({ key: "fallback" });
+    });
+
+    it("works inline with other text and vars", () => {
+      const scenarios: SubstitutionScenario[] = [
+        {
+          name: "default with prefix/suffix",
+          config: { key: "prefix-${VAR:-default}-suffix" },
+          env: {},
+          expected: { key: "prefix-default-suffix" },
+        },
+        {
+          name: "mix of default and required vars",
+          config: { key: "${HOST:-localhost}:${PORT}" },
+          env: { PORT: "8080" },
+          expected: { key: "localhost:8080" },
+        },
+      ];
+
+      expectResolvedScenarios(scenarios);
+    });
+
+    it("works in nested structures", () => {
+      expect(
+        resolveConfigEnvVars(
+          { outer: { inner: "${DEEP:-nested-default}" } },
+          {} as NodeJS.ProcessEnv,
+        ),
+      ).toEqual({ outer: { inner: "nested-default" } });
+    });
+
+    it("does not trigger onMissing when default is present", () => {
+      const warnings: EnvSubstitutionWarning[] = [];
+      const result = resolveConfigEnvVars(
+        { key: "${MISSING:-fallback}" },
+        {} as NodeJS.ProcessEnv,
+        { onMissing: (w) => warnings.push(w) },
+      );
+      expect(result).toEqual({ key: "fallback" });
+      expect(warnings).toHaveLength(0);
+    });
+
+    it("is detected by containsEnvVarReference", () => {
+      expect(containsEnvVarReference("${VAR:-default}")).toBe(true);
+      expect(containsEnvVarReference("${VAR:-}")).toBe(true);
+    });
+  });
+
   describe("containsEnvVarReference", () => {
     it("detects unresolved env var placeholders", () => {
       expect(containsEnvVarReference("${FOO}")).toBe(true);

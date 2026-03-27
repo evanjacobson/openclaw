@@ -16,10 +16,10 @@ import { isPlainObject } from "../infra/plain-object.js";
  * resolves to), the new value is kept as-is.
  */
 
-const ENV_VAR_PATTERN = /\$\{[A-Z_][A-Z0-9_]*\}/;
+const ENV_VAR_PATTERN = /\$\{[A-Z_][A-Z0-9_]*(:-[^}]*)?\}/;
 
 /**
- * Check if a string contains any `${VAR}` env var references.
+ * Check if a string contains any `${VAR}` or `${VAR:-default}` env var references.
  */
 function hasEnvVarRef(value: string): boolean {
   return ENV_VAR_PATTERN.test(value);
@@ -53,14 +53,28 @@ function tryResolveString(template: string, env: NodeJS.ProcessEnv): string | nu
         }
       }
 
-      // Substitution: ${VAR} -> env value
+      // Substitution: ${VAR} or ${VAR:-default} -> env value or default
       if (template[i + 1] === "{") {
         const start = i + 2;
         const end = template.indexOf("}", start);
         if (end !== -1) {
-          const name = template.slice(start, end);
-          if (ENV_VAR_NAME.test(name)) {
-            const val = env[name];
+          const inner = template.slice(start, end);
+          const sepIndex = inner.indexOf(":-");
+          if (sepIndex !== -1) {
+            const name = inner.slice(0, sepIndex);
+            if (ENV_VAR_NAME.test(name)) {
+              const val = env[name];
+              if (val === undefined || val === "") {
+                chunks.push(inner.slice(sepIndex + 2));
+              } else {
+                chunks.push(val);
+              }
+              i = end;
+              continue;
+            }
+          }
+          if (ENV_VAR_NAME.test(inner)) {
+            const val = env[inner];
             if (val === undefined || val === "") {
               return null;
             }
