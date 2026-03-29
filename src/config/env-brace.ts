@@ -11,9 +11,12 @@ export function findClosingBrace(str: string, openPos: number): number {
   let depth = 1;
   for (let i = openPos + 1; i < str.length; i++) {
     const ch = str[i];
-    // Skip quoted strings — braces inside them are not structural
+    // Skip quoted strings — braces inside them are not structural.
+    // If no matching closing quote is found before end-of-string, treat the
+    // initial quote as a literal character (handles e.g. `don't` in defaults).
     if (ch === '"' || ch === "'") {
       const quote = ch;
+      const savedPos = i;
       i++;
       while (i < str.length && str[i] !== quote) {
         if (str[i] === "\\") {
@@ -21,8 +24,13 @@ export function findClosingBrace(str: string, openPos: number): number {
         } // skip escaped char
         i++;
       }
-      // i now points at the closing quote (or past end); loop increment advances past it
-      continue;
+      if (i < str.length) {
+        // Found matching closing quote; i points at it, loop increment advances past it
+        continue;
+      }
+      // No matching quote — treat the initial quote as a literal character
+      i = savedPos;
+      // Fall through: quote is neither '{' nor '}', so brace depth is unaffected
     }
     if (ch === "{") {
       depth++;

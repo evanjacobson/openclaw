@@ -513,6 +513,22 @@ describe("resolveConfigEnvVars", () => {
     it("escaped quote inside quoted string in default", () => {
       expect(resolveConfigEnvVars('${CFG:-{"k":"a\\"}"}}', {})).toBe('{"k":"a\\"}"}');
     });
+
+    it("unpaired single quote in default does not break parsing", () => {
+      expect(resolveConfigEnvVars("${NAME:-don't}", {})).toBe("don't");
+    });
+
+    it("unpaired single quote in default: var set uses env value", () => {
+      expect(resolveConfigEnvVars("${NAME:-don't}", { NAME: "John" })).toBe("John");
+    });
+
+    it("unpaired double quote in default does not break parsing", () => {
+      expect(resolveConfigEnvVars('${MSG:-a"b}', {})).toBe('a"b');
+    });
+
+    it("unpaired double quote in default: var set uses env value", () => {
+      expect(resolveConfigEnvVars('${MSG:-a"b}', { MSG: "hello" })).toBe("hello");
+    });
   });
 
   describe("real-world config patterns", () => {

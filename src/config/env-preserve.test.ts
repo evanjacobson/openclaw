@@ -220,6 +220,16 @@ describe("restoreEnvVarRefs", () => {
     expect(result).toBe("${TMPL:-{key:{nested}}}");
   });
 
+  it("correctly round-trips template with unpaired single quote in default", () => {
+    const result = restoreEnvVarRefs("don't", "${NAME:-don't}", env);
+    expect(result).toBe("${NAME:-don't}");
+  });
+
+  it("correctly round-trips template with unpaired double quote in default", () => {
+    const result = restoreEnvVarRefs('a"b', '${MSG:-a"b}', env);
+    expect(result).toBe('${MSG:-a"b}');
+  });
+
   it("does not confuse $${VAR} escape with ${VAR} substitution", () => {
     // Config has both: an escaped ref and a real ref
     const incoming = {
