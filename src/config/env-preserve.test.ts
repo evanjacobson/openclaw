@@ -206,6 +206,20 @@ describe("restoreEnvVarRefs", () => {
     expect(result).toBe("$${VAR:-default}");
   });
 
+  it("correctly round-trips template with brace-containing default", () => {
+    const result = restoreEnvVarRefs(
+      "https://api.example.com/v1/{id}",
+      "${URL:-https://api.example.com/v1/{id}}",
+      env,
+    );
+    expect(result).toBe("${URL:-https://api.example.com/v1/{id}}");
+  });
+
+  it("correctly round-trips template with doubly-nested brace default", () => {
+    const result = restoreEnvVarRefs("{key:{nested}}", "${TMPL:-{key:{nested}}}", env);
+    expect(result).toBe("${TMPL:-{key:{nested}}}");
+  });
+
   it("does not confuse $${VAR} escape with ${VAR} substitution", () => {
     // Config has both: an escaped ref and a real ref
     const incoming = {

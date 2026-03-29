@@ -1,4 +1,5 @@
 import { isPlainObject } from "../infra/plain-object.js";
+import { findClosingBrace } from "./env-brace.js";
 
 /**
  * Preserves `${VAR}` environment variable references during config write-back.
@@ -16,18 +17,24 @@ import { isPlainObject } from "../infra/plain-object.js";
  * resolves to), the new value is kept as-is.
  */
 
-const ENV_VAR_PATTERN = /(?<!\$)\$\{[A-Z_][A-Z0-9_]*(:-[^}]*)?\}/;
-// Matches escaped sequences $${VAR} or $${VAR:-default} that also need round-tripping
-const ENV_VAR_ESCAPE_PATTERN = /\$\$\{[A-Z_][A-Z0-9_]*(:-[^}]*)?\}/;
+// Fast heuristic: only checks for the token *start*, not the full token.
+// The actual authoritative parsing (with correct brace depth) is done by tryResolveString.
+// Detects any unescaped ${UPPERCASE... token start
+const ENV_VAR_START_PATTERN = /(?<!\$)\$\{[A-Z_]/;
+// Detects any escaped $${UPPERCASE... token start
+const ENV_VAR_ESCAPE_START_PATTERN = /\$\$\{[A-Z_]/;
 
 /**
- * Check if a string contains any `${VAR}`, `${VAR:-default}`, or `$${VAR}` patterns
- * that require env-var round-trip handling.
+ * Fast pre-filter: returns true if `value` might contain any `${VAR}`, `${VAR:-default}`,
+ * or `$${VAR}` token starts that require env-var round-trip handling.
+ * Only checks for token starts — tryResolveString is the authoritative parser and handles
+ * arbitrary brace nesting depths correctly via findClosingBrace.
  */
 function hasEnvVarRef(value: string): boolean {
-  // ENV_VAR_PATTERN's negative lookbehind excludes $${…} sequences, so
-  // ENV_VAR_ESCAPE_PATTERN is required to detect them separately here.
-  return ENV_VAR_PATTERN.test(value) || ENV_VAR_ESCAPE_PATTERN.test(value);
+  // ENV_VAR_START_PATTERN's negative lookbehind excludes $${…} sequences, so
+  // ENV_VAR_ESCAPE_START_PATTERN is required to detect them separately here.
+  // Both patterns only match the token start; tryResolveString handles full parsing.
+  return ENV_VAR_START_PATTERN.test(value) || ENV_VAR_ESCAPE_START_PATTERN.test(value);
 }
 
 /**
@@ -47,7 +54,7 @@ function tryResolveString(template: string, env: NodeJS.ProcessEnv): string | nu
       // Escaped: $${VAR} -> literal ${VAR} or $${VAR:-default} -> literal ${VAR:-default}
       if (template[i + 1] === "$" && template[i + 2] === "{") {
         const start = i + 3;
-        const end = template.indexOf("}", start);
+        const end = findClosingBrace(template, i + 2);
         if (end !== -1) {
           const inner = template.slice(start, end);
           const sepIdx = inner.indexOf(":-");
@@ -63,7 +70,7 @@ function tryResolveString(template: string, env: NodeJS.ProcessEnv): string | nu
       // Substitution: ${VAR} or ${VAR:-default} -> env value or default
       if (template[i + 1] === "{") {
         const start = i + 2;
-        const end = template.indexOf("}", start);
+        const end = findClosingBrace(template, i + 1);
         if (end !== -1) {
           const inner = template.slice(start, end);
           const sepIndex = inner.indexOf(":-");

@@ -219,6 +219,10 @@ describe("resolveConfigEnvVars", () => {
         "${VAR:-https://url.example.com}",
       );
     });
+
+    it("escape with brace-containing default is preserved as literal", () => {
+      expect(resolveConfigEnvVars("$${VAR:-{id}}", {})).toBe("${VAR:-{id}}");
+    });
   });
 
   describe("pattern matching rules", () => {
@@ -472,6 +476,26 @@ describe("resolveConfigEnvVars", () => {
     it("detects references mixed with escaped placeholders", () => {
       expect(containsEnvVarReference("$${ESCAPED} ${REAL}")).toBe(true);
       expect(containsEnvVarReference("${REAL} $${ESCAPED}")).toBe(true);
+    });
+  });
+
+  describe("default value containing braces (brace-balanced scanner)", () => {
+    it("default value containing braces resolves correctly when var is unset", () => {
+      expect(resolveConfigEnvVars("${URL:-https://api.example.com/v1/{id}}", {})).toBe(
+        "https://api.example.com/v1/{id}",
+      );
+    });
+
+    it("default value containing braces: var set uses env value not default", () => {
+      expect(
+        resolveConfigEnvVars("${URL:-https://api.example.com/v1/{id}}", {
+          URL: "https://custom.io",
+        }),
+      ).toBe("https://custom.io");
+    });
+
+    it("default value with nested braces resolves correctly", () => {
+      expect(resolveConfigEnvVars("${TMPL:-{key:{nested}}}", {})).toBe("{key:{nested}}");
     });
   });
 

@@ -26,6 +26,7 @@
 // Pattern for valid uppercase env var names: starts with letter or underscore,
 // followed by letters, numbers, or underscores (all uppercase)
 import { isPlainObject } from "../utils.js";
+import { findClosingBrace } from "./env-brace.js";
 
 const ENV_VAR_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
 
@@ -56,7 +57,7 @@ function parseEnvTokenAt(value: string, index: number): EnvToken | null {
   // Escaped: $${VAR} -> ${VAR} or $${VAR:-default} -> ${VAR:-default}
   if (next === "$" && afterNext === "{") {
     const start = index + 3;
-    const end = value.indexOf("}", start);
+    const end = findClosingBrace(value, index + 2);
     if (end !== -1) {
       const inner = value.slice(start, end);
       const sepIdx = inner.indexOf(":-");
@@ -70,7 +71,7 @@ function parseEnvTokenAt(value: string, index: number): EnvToken | null {
   // Substitution: ${VAR} or ${VAR:-default} -> value
   if (next === "{") {
     const start = index + 2;
-    const end = value.indexOf("}", start);
+    const end = findClosingBrace(value, index + 1);
     if (end !== -1) {
       const inner = value.slice(start, end);
       const sepIndex = inner.indexOf(":-");
