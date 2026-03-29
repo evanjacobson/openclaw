@@ -497,6 +497,22 @@ describe("resolveConfigEnvVars", () => {
     it("default value with nested braces resolves correctly", () => {
       expect(resolveConfigEnvVars("${TMPL:-{key:{nested}}}", {})).toBe("{key:{nested}}");
     });
+
+    it("quoted brace inside default does not end placeholder early", () => {
+      expect(resolveConfigEnvVars('${CFG:-{"key":"}"}}', {})).toBe('{"key":"}"}');
+    });
+
+    it("quoted brace inside default: var set uses env value", () => {
+      expect(resolveConfigEnvVars('${CFG:-{"key":"}"}}', { CFG: "override" })).toBe("override");
+    });
+
+    it("single-quoted brace inside default is handled", () => {
+      expect(resolveConfigEnvVars("${CFG:-{'k':'}'}}", {})).toBe("{'k':'}'}");
+    });
+
+    it("escaped quote inside quoted string in default", () => {
+      expect(resolveConfigEnvVars('${CFG:-{"k":"a\\"}"}}', {})).toBe('{"k":"a\\"}"}');
+    });
   });
 
   describe("real-world config patterns", () => {
